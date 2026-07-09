@@ -7,12 +7,12 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f2f2f7;color:#1a1a1a;font-size:15px}
-.app{max-width:420px;margin:0 auto;background:#f2f2f7;min-height:100vh}
+.app{max-width:420px;margin:0 auto;background:#f2f2f7;min-height:100vh;position:relative}
 .nav{display:flex;border-bottom:1px solid #d0d0d0;background:#fff;position:sticky;top:0;z-index:10;overflow-x:auto}
 .nav-btn{flex:1;min-width:46px;padding:11px 2px;font-size:10.5px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:#888;cursor:pointer;white-space:nowrap;letter-spacing:0.1px}
 .nav-btn.active{color:#1a6b3c;border-bottom-color:#1a6b3c}
-.screen{display:none;padding:16px;position:absolute;visibility:hidden;pointer-events:none}
-.screen.active{display:block;position:relative;visibility:visible;pointer-events:auto}
+.screen{display:none;}
+.screen.active{display:block;padding:16px;}
 .card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
 label{display:block;font-size:12px;color:#666;margin-bottom:5px;margin-top:14px;font-weight:500}
 label:first-child{margin-top:0}
@@ -267,7 +267,7 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
 
 
 <!-- ── LIMPIEZA ─────────────────────────────── -->
-<div class="screen" id="s-limpieza" style="padding-top:0">
+<div class="screen" id="s-limpieza">
   <div class="card" style="padding:12px 14px">
     <p class="sec-title" style="margin-bottom:8px">¿Qué se ha limpiado?</p>
     <div id="limp-checks"></div>

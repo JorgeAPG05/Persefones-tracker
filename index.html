@@ -291,7 +291,7 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPV_Ws5Z22y0E3myo5ZjZm8WLV528_lgKcHdCvZvMPNo1ORXdRur5zcg_ZYjGA7bXm9Q/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwkEWOMKRHZKuawEKP-Mkpody1rzcOA-6ZqSL0dW4BPdO15SPZalJguD2A_9EYQbg0Dw/exec';
 
 const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
@@ -777,21 +777,77 @@ async function registrarCosecha(parcial){
 }
 
 // ── EN CURSO ──────────────────────────────────
+let encExpandedIdx = null;
+
 function renderEnCurso(){
   const activas=db.tandas.filter(t=>!t.cerrada).sort((a,b)=>new Date(a.fechaCosechaEst)-new Date(b.fechaCosechaEst));
   const msg=document.getElementById('msg-enc'),cont=document.getElementById('lista-enc'),h=hoy();
   if(!activas.length){msg.style.display='block';cont.innerHTML='';return;}
   msg.style.display='none';
   cont.innerHTML=activas.map(t=>{
+    const ri=db.tandas.indexOf(t);
     const dl=Math.ceil((new Date(t.fechaCosechaEst)-new Date(h))/86400000);
     const badge=dl<0?`<span class="badge b-late">${Math.abs(dl)}d vencida</span>`:dl===0?'<span class="badge b-warn">hoy</span>':dl<=2?`<span class="badge b-warn">${dl}d</span>`:`<span class="badge b-ok">${dl}d</span>`;
-    return `<div class="row"><div>
-      <div class="row-id">${t.id}${t.parcial?' <small style="font-weight:400;color:#aaa">(parcial)</small>':''}</div>
-      <div class="row-sub">${t.bandejas} bdj · ${t.nombre}</div>
-      <div class="row-sub">Lote: ${t.lote||'—'}${t.lote2?' + '+t.lote2:''} · ${t.proveedor||'—'}</div>
-      <div class="row-sub">Siembra ${fmt(t.fechaSiembra)} · Est. ${fmt(t.fechaCosechaEst)}</div>
-    </div>${badge}</div>`;
+    const expanded = encExpandedIdx === ri;
+    return `<div style="border-bottom:1px solid #f0f0f0">
+      <div class="row" style="border-bottom:none;cursor:pointer" onclick="toggleEncurso(${ri})">
+        <div style="flex:1">
+          <div class="row-id">${t.id}${t.parcial?' <small style="font-weight:400;color:#aaa">(parcial)</small>':''}</div>
+          <div class="row-sub">${t.bandejas} bdj · ${t.nombre}</div>
+          <div class="row-sub">Lote: ${t.lote||'—'}${t.lote2?' + '+t.lote2:''} · ${t.proveedor||'—'}</div>
+          <div class="row-sub">Siembra ${fmt(t.fechaSiembra)} · Est. ${fmt(t.fechaCosechaEst)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          ${badge}
+          <span style="font-size:11px;color:#aaa">${expanded?'▲':'▼'}</span>
+        </div>
+      </div>
+      ${expanded ? `
+      <div style="background:#f8f8f8;border-radius:10px;padding:12px;margin-bottom:10px">
+        <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">Modificar tanda</p>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:13px;color:#666;white-space:nowrap">Bandejas actuales: <strong>${t.bandejas}</strong> → nuevo total:</span>
+          <input type="number" id="enc-bdj-${ri}" min="0" max="${t.bandejas}" value="${t.bandejas}" style="width:64px;padding:8px;font-size:15px;font-weight:600;text-align:center;border:1px solid #e0e0e0;border-radius:8px;background:#fff">
+        </div>
+        <textarea id="enc-nota-${ri}" placeholder="Nota (ej: 3 bandejas con damping off, 1 caída accidental...)" style="width:100%;padding:9px 12px;font-size:13px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;resize:vertical;min-height:56px;font-family:inherit;margin-bottom:10px"></textarea>
+        <div style="display:flex;gap:8px">
+          <button onclick="guardarModificacion(${ri})" style="flex:1;padding:11px;background:#1a6b3c;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer">Guardar cambio</button>
+          <button onclick="toggleEncurso(null)" style="padding:11px 16px;background:#fff;border:1px solid #d0d0d0;border-radius:9px;font-size:14px;cursor:pointer">Cancelar</button>
+        </div>
+      </div>` : ''}
+    </div>`;
   }).join('');
+}
+
+function toggleEncurso(idx){
+  encExpandedIdx = encExpandedIdx === idx ? null : idx;
+  renderEnCurso();
+}
+
+async function guardarModificacion(idx){
+  const t = db.tandas[idx];
+  const nuevasBdj = parseInt(document.getElementById('enc-bdj-'+idx).value);
+  const nota = document.getElementById('enc-nota-'+idx).value.trim();
+  if(isNaN(nuevasBdj) || nuevasBdj < 0){toast('Indica un número válido de bandejas');return;}
+  if(nuevasBdj >= t.bandejas){toast('El nuevo total debe ser menor al actual');return;}
+  const reduccion = t.bandejas - nuevasBdj;
+  t.bandejas = nuevasBdj;
+  if(nuevasBdj === 0){ t.cerrada = true; }
+  save();
+  toast(`Tanda ${t.id} actualizada — ${reduccion} bdj retiradas`);
+  encExpandedIdx = null;
+  // Registrar en Sheet como incidencia
+  await syncSheet({
+    tipo: 'incidencia',
+    fecha: hoy(),
+    tandaId: t.id,
+    variedad: t.nombre,
+    bdjAntes: t.bandejas + reduccion,
+    bdjDespues: nuevasBdj,
+    reduccion,
+    nota: nota || ''
+  });
+  renderEnCurso();
 }
 
 // ── RESUMEN ───────────────────────────────────
@@ -952,10 +1008,70 @@ async function registrarLimpieza(){
   }
 }
 
+// ── SYNC DESDE SHEET ─────────────────────────
+async function cargarDesdeSheet() {
+  const loadDiv = document.createElement('div');
+  loadDiv.id = 'loading-overlay';
+  loadDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(242,242,247,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;';
+  loadDiv.innerHTML = '<div style="width:36px;height:36px;border:3px solid #e0e0e0;border-top-color:#1a6b3c;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:14px"></div><p style="font-size:14px;color:#666;font-weight:500">Sincronizando datos...</p>';
+  document.body.appendChild(loadDiv);
+
+  // Añadir animación spinner
+  if (!document.getElementById('spin-style')) {
+    const style = document.createElement('style');
+    style.id = 'spin-style';
+    style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(style);
+  }
+
+  try {
+    const res = await fetch(SCRIPT_URL, {method:'GET', mode:'cors'});
+    const data = await res.json();
+
+    if (data.ok) {
+      // Actualizar lotes activos en variedades
+      db.variedades = db.variedades.map(v => {
+        const loteInfo = data.lotes[v.codigo];
+        if (loteInfo && loteInfo.lote) {
+          return {...v, proveedor: loteInfo.proveedor, lote: loteInfo.lote, lote2: loteInfo.lote2 || ''};
+        }
+        return v;
+      });
+
+      // Reconstruir tandas activas desde Sheet
+      // Conservar tandas locales que aún no están en el Sheet (recién creadas offline)
+      const idsSheet = new Set(data.tandas.map(t => t.id));
+      const localOffline = db.tandas.filter(t => !t.cerrada && !idsSheet.has(t.id));
+
+      // Reconstruir tandas del Sheet con fechas de cosecha estimadas
+      const tandasSheet = data.tandas.map(t => {
+        const v = db.variedades.find(vv => vv.codigo === t.codigo);
+        const dias = v ? v.dias : 10;
+        return {
+          ...t,
+          fechaCosechaEst: t.fechaSiembra ? addD(t.fechaSiembra, dias) : '',
+          cerrada: false
+        };
+      });
+
+      db.tandas = [...tandasSheet, ...localOffline];
+      save();
+      console.log('Sync OK — ' + db.tandas.length + ' tandas activas, ' + Object.keys(data.lotes).length + ' lotes');
+    }
+  } catch(err) {
+    console.log('Sin conexión — usando datos locales:', err.message);
+  } finally {
+    document.body.removeChild(loadDiv);
+  }
+}
+
 // ── INIT ──────────────────────────────────────
-document.getElementById('fecha-s').value=hoy();
+document.getElementById('fecha-s').value = hoy();
 poblarVarSel();
-renderHoy();
+cargarDesdeSheet().then(() => {
+  poblarVarSel();
+  renderHoy();
+});
 </script>
 </body>
 </html>

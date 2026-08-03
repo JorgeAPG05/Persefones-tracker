@@ -174,6 +174,14 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
       <p class="sec-title">Selecciona tanda</p>
       <p id="msg-cos" style="font-size:13px;color:#888">No hay tandas activas.</p>
       <div id="lista-cos"></div>
+      <div id="panel-bdj-cosechar" style="display:none;margin-top:12px;padding:12px;background:#f0faf4;border-radius:10px;border:1px solid #c8e6d4">
+        <p style="font-size:12px;font-weight:600;color:#1a6b3c;margin-bottom:8px">Bandejas a cosechar</p>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="number" id="cos-bdj-input" min="0" style="width:80px;padding:9px;font-size:16px;font-weight:700;text-align:center;border:1px solid #c8e6d4;border-radius:8px;background:#fff">
+          <span style="font-size:13px;color:#666">de <strong id="cos-bdj-max">0</strong> disponibles</span>
+        </div>
+        <p style="font-size:11px;color:#888;margin-top:6px">Si cosechas todas, la tanda se cierra. Si cosechas parcialmente, queda activa.</p>
+      </div>
     </div>
     <div id="cos-comp" style="display:none">
       <label style="margin-top:0">Producto</label>
@@ -291,7 +299,7 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwkEWOMKRHZKuawEKP-Mkpody1rzcOA-6ZqSL0dW4BPdO15SPZalJguD2A_9EYQbg0Dw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwIpB5QzmFnBSCLgf1HPc1LU7D4txJqr78bjQrswhsbkfqbN85_o0d7HHzXDrxn61cmTA/exec';
 
 const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
@@ -466,7 +474,7 @@ function renderHoyLista(){
         ${item.yaRegistrada?'<div style="font-size:10px;color:#1a6b3c;margin-top:2px">✓ Ya registrada hoy</div>':''}
       </div>
       <div class="hoy-bdj">
-        <input type="number" min="1" value="${item.bdj}" 
+        <input type="number" value="${item.bdj}" 
           onchange="updateHoyBdj(${i},this.value)"
           onclick="event.stopPropagation()"
           ${!item.activa?'disabled':''}>
@@ -651,7 +659,9 @@ function setTipo(tipo,btn){
   document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
   document.getElementById('cos-indiv').style.display=tipo==='individual'?'block':'none';
   document.getElementById('cos-comp').style.display=tipo==='compuesto'?'block':'none';
-  document.getElementById('panel-output').style.display='none';tandaIdx=null;
+  document.getElementById('panel-output').style.display='none';
+  const bdjP=document.getElementById('panel-bdj-cosechar');if(bdjP)bdjP.style.display='none';
+  tandaIdx=null;
 }
 
 function renderCosechar(){
@@ -682,7 +692,13 @@ function selTanda(idx){
   const r=document.getElementById('rc-'+idx);if(r)r.classList.add('on');
   tandaIdx=idx;
   const t=db.tandas[idx];
-  document.getElementById('output-label').textContent=t.id+' · '+t.bandejas+' bdj';
+  document.getElementById('output-label').textContent=t.id+' · '+t.bandejas+' bdj disponibles';
+  // Mostrar selector de bandejas a cosechar
+  const bdjPanel = document.getElementById('panel-bdj-cosechar');
+  document.getElementById('cos-bdj-max').textContent = t.bandejas;
+  document.getElementById('cos-bdj-input').value = t.bandejas;
+  document.getElementById('cos-bdj-input').max = t.bandejas;
+  bdjPanel.style.display = 'block';
   document.getElementById('panel-output').style.display='block';
   updateLotePreview();
 }
@@ -732,10 +748,13 @@ async function registrarCosecha(parcial){
   if(tipoCos==='individual'){
     if(tandaIdx===null){toast('Selecciona una tanda');return;}
     const t=db.tandas[tandaIdx],lote=t.codigo+'-'+fecha;
-    db.cosechas.push({lote,tipo:'individual',tandaId:t.id,codigo:t.codigo,nombre:t.nombre,env30:e30,env35:e35,env100:e100,fecha,parcial});
-    if(!parcial)t.cerrada=true;else t.parcial=true;
-    save();toast(parcial?'Cosecha parcial registrada':'Lote '+lote+' cerrado');
-    payload={tipo:'cosecha',fecha,lote,tipo_cos:'individual',tandaId:t.id,nombre:t.nombre,bandejasTotales:t.bandejas,env30:e30,env35:e35,env100:e100,parcial};
+    const bdjCosechadas=parseInt(document.getElementById('cos-bdj-input')?.value)||t.bandejas;
+    const parcialAuto = bdjCosechadas < t.bandejas;
+    if(parcialAuto){t.parcial=true;t.bandejas=t.bandejas-bdjCosechadas;}
+    else{t.cerrada=true;}
+    db.cosechas.push({lote,tipo:'individual',tandaId:t.id,codigo:t.codigo,nombre:t.nombre,env30:e30,env35:e35,env100:e100,fecha,parcial:parcialAuto});
+    save();toast(parcialAuto?'Cosecha parcial — tanda sigue activa':'Lote '+lote+' cerrado');
+    payload={tipo:'cosecha',fecha,lote,tipo_cos:'individual',tandaId:t.id,nombre:t.nombre,bandejasTotales:bdjCosechadas,env30:e30,env35:e35,env100:e100,parcial:parcialAuto};
   } else {
     const cod=document.getElementById('prod-sel').value;
     if(!cod){toast('Selecciona un producto');return;}
@@ -759,7 +778,9 @@ async function registrarCosecha(parcial){
     payload={tipo:'cosecha',fecha,lote,tipo_cos:'compuesto',producto:prod.nombre,tandasUsadas:usadas,bandejasTotales:bdjTotales,env30:e30,env35:e35,env100:e100,parcial};
   }
   ['env30','env35','env100'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('panel-output').style.display='none';tandaIdx=null;
+  document.getElementById('panel-output').style.display='none';
+  const bdjP=document.getElementById('panel-bdj-cosechar');if(bdjP)bdjP.style.display='none';
+  tandaIdx=null;
   const ind=document.getElementById('sync-c');
   ind.className='sync-indicator sync-pending';ind.querySelector('.dot').className='dot dot-pending';
   document.getElementById('sync-c-txt').textContent='Enviando...';ind.style.display='flex';

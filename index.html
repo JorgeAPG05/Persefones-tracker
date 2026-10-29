@@ -92,11 +92,44 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
 .progress-bar{height:4px;background:#e0e0e0;border-radius:4px;margin-bottom:16px;overflow:hidden}
 .progress-fill{height:100%;background:#1a6b3c;border-radius:4px;transition:width 0.3s}
 .sync-row{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 0}
+
+/* ── ESCRITORIO (≥ 900 px): menú lateral y contenido a lo ancho ── */
+.nav-brand{display:none}
+@media (min-width:900px){
+  body{font-size:15px}
+  .app{max-width:1280px;display:grid;grid-template-columns:210px minmax(0,1fr);align-items:start}
+  .nav{flex-direction:column;height:100vh;overflow:visible;border-bottom:none;border-right:1px solid #e3e3e8;padding:18px 12px;gap:2px}
+  .nav-brand{display:block;font-size:17px;font-weight:700;color:#1a6b3c;padding:4px 14px 18px}
+  .nav-brand small{display:block;font-size:11px;font-weight:500;color:#999;margin-top:2px}
+  .nav-btn{flex:none;text-align:left;font-size:14px;padding:10px 14px;border-bottom:none;border-radius:8px;color:#555}
+  .nav-btn:hover{background:#f2f2f7}
+  .nav-btn.active{background:#e6f2ea;color:#1a6b3c}
+  .screen{grid-column:2}
+  .screen.active{padding:28px 36px 48px}
+  /* Pantallas de formulario: ancho cómodo de lectura */
+  #s-hoy.active,#s-sembrar.active,#s-cosechar.active,#s-resumen.active,#s-limpieza.active{max-width:760px}
+  /* En curso: tarjetas en rejilla */
+  #s-encurso.active{max-width:1100px}
+  #lista-enc{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 28px}
+  /* Catálogo: dos columnas (lista | formulario), plantilla a lo ancho */
+  #s-catalogo.active{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+  #s-catalogo .card:last-child{grid-column:1/-1}
+  #plantilla-editor{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 24px}
+  /* Semillas: lista en rejilla, entrada y ajuste lado a lado */
+  #s-semillas.active{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+  #s-semillas .card:first-child{grid-column:1/-1}
+  #sem-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:10px}
+  #sem-lista .row{border:1px solid #ececf0;border-radius:10px;padding:12px 14px}
+  #sem-lista .row:last-child{border-bottom:1px solid #ececf0}
+  #s-semillas .card:first-child .btn{max-width:320px}
+  .toast{bottom:32px}
+}
 </style>
 </head>
 <body>
 <div class="app">
 <div class="nav">
+  <div class="nav-brand">Persefonés<small>Trazabilidad · Km0</small></div>
   <button class="nav-btn active" onclick="setScreen('hoy',this)">Hoy</button>
   <button class="nav-btn" onclick="setScreen('sembrar',this)">Sembrar</button>
   <button class="nav-btn" onclick="setScreen('cosechar',this)">Cosechar</button>

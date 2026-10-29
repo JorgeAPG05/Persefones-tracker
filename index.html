@@ -9,7 +9,7 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f2f2f7;color:#1a1a1a;font-size:15px}
 .app{max-width:420px;margin:0 auto;background:#f2f2f7;min-height:100vh;position:relative}
 .nav{display:flex;border-bottom:1px solid #d0d0d0;background:#fff;position:sticky;top:0;z-index:10;overflow-x:auto}
-.nav-btn{flex:1;min-width:46px;padding:11px 2px;font-size:10.5px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:#888;cursor:pointer;white-space:nowrap;letter-spacing:0.1px}
+.nav-btn{flex:1 0 auto;padding:11px 8px;font-size:10.5px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:#888;cursor:pointer;white-space:nowrap;letter-spacing:0.1px}
 .nav-btn.active{color:#1a6b3c;border-bottom-color:#1a6b3c}
 .screen{display:none;}
 .screen.active{display:block;padding:16px;}
@@ -103,6 +103,7 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
   <button class="nav-btn" onclick="setScreen('encurso',this)">En curso</button>
   <button class="nav-btn" onclick="setScreen('resumen',this)">Resumen</button>
   <button class="nav-btn" onclick="setScreen('limpieza',this)">Limpieza</button>
+  <button class="nav-btn" onclick="setScreen('semillas',this)">Semillas</button>
   <button class="nav-btn" onclick="setScreen('catalogo',this)">Catálogo</button>
 </div>
 
@@ -113,9 +114,22 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
     <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
   </div>
   <div id="hoy-lista"></div>
+  <div class="card" id="hoy-add" style="padding:12px 14px">
+    <p class="sec-title" style="margin-bottom:8px">Añadir variedad a hoy</p>
+    <select id="hoy-add-var"></select>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input type="number" id="hoy-add-bdj" min="1" placeholder="Bandejas" style="flex:1">
+      <select id="hoy-add-dest" style="flex:1"></select>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:8px;padding:10px" onclick="addHoyItem()">+ Añadir</button>
+  </div>
   <div id="hoy-actions" style="display:none">
+    <label id="hoy-save-tpl-wrap" style="display:none;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:#1a1a1a">
+      <input type="checkbox" id="hoy-save-tpl" style="width:18px;height:18px;accent-color:#1a6b3c">
+      <span id="hoy-save-tpl-txt">Guardar estos cambios en la plantilla</span>
+    </label>
     <button class="btn btn-primary" onclick="confirmarHoy()">Confirmar y registrar siembras</button>
-    <button class="btn btn-secondary" onclick="renderHoy()">Restablecer plantilla</button>
+    <button class="btn btn-secondary" onclick="if(confirm('¿Descartar los cambios de hoy y volver a la plantilla?'))renderHoy(true)">Restablecer plantilla</button>
   </div>
   <div id="hoy-sync-log" style="margin-top:8px"></div>
 </div>
@@ -211,6 +225,7 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
 
 <!-- ── EN CURSO ────────────────────────────── -->
 <div class="screen" id="s-encurso">
+  <div id="venc-panel"></div>
   <div class="card">
     <p class="sec-title">Sembrado — pendiente de cosechar</p>
     <p id="msg-enc" style="font-size:13px;color:#888">No hay tandas activas.</p>
@@ -271,7 +286,6 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
     <button class="btn btn-primary" style="margin-top:12px" onclick="guardarPlantilla()">Guardar plantilla</button>
   </div>
 </div>
-</div>
 
 
 <!-- ── LIMPIEZA ─────────────────────────────── -->
@@ -295,6 +309,42 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
   </div>
   <button class="btn btn-primary" onclick="registrarLimpieza()">Registrar limpieza</button>
 </div>
+
+<!-- ── SEMILLAS ─────────────────────────────── -->
+<div class="screen" id="s-semillas">
+  <div class="card">
+    <p class="sec-title">Stock de semillas</p>
+    <p style="font-size:12px;color:#888;margin-bottom:6px">Aviso por email cuando quede semilla para el plazo de entrega + 7 días. El stock se descuenta solo con cada siembra (bandejas × g/bandeja).</p>
+    <div id="sem-lista"></div>
+    <button class="btn btn-primary" onclick="guardarConfigSemillas()">Guardar densidades y plazos</button>
+  </div>
+  <div class="card" id="sem-entrada-card">
+    <p class="sec-title">Registrar entrada de semillas</p>
+    <label>Variedad</label><select id="se-var" onchange="onSemEntradaVar()"></select>
+    <div class="two-col">
+      <div><label>Gramos recibidos</label><input type="number" id="se-g" min="0" step="0.1" placeholder="ej: 500"></div>
+      <div><label>Fecha</label><input type="date" id="se-fecha"></div>
+    </div>
+    <label>Proveedor</label>
+    <select id="se-prov"><option value="">—</option><option>MP Seeds</option><option>Brot d'Or</option><option>Kimuak</option></select>
+    <label>Número de lote</label><input type="text" id="se-lote" placeholder="el que figura en el envase">
+    <label>Lote secundario <span class="opt">opcional</span></label><input type="text" id="se-lote2">
+    <label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;color:#1a1a1a;font-size:13px">
+      <input type="checkbox" id="se-activo" style="width:18px;height:18px;flex-shrink:0;accent-color:#1a6b3c">
+      <span>Usar ya como lote activo<br><span style="font-size:11px;color:#888">Márcalo solo si empiezas a sembrar de esta bolsa ahora. Si aún gastas la anterior, cámbialo después en "Sembrar → Cambiar lote".</span></span>
+    </label>
+    <button class="btn btn-primary" onclick="registrarEntradaSemillas()">Registrar entrada</button>
+  </div>
+  <div class="card">
+    <p class="sec-title">Ajustar stock</p>
+    <p style="font-size:12px;color:#888;margin-bottom:6px">Para corregir el stock tras pesar o contar lo que queda.</p>
+    <label>Variedad</label><select id="sa-var"></select>
+    <label>Gramos que quedan realmente</label><input type="number" id="sa-g" min="0" step="0.1">
+    <label>Nota <span class="opt">opcional</span></label><input type="text" id="sa-nota" placeholder="ej: pesado en báscula">
+    <button class="btn btn-secondary" onclick="ajustarStockSemillas()">Guardar ajuste</button>
+  </div>
+</div>
+</div><!-- /.app -->
 
 <div class="toast" id="toast"></div>
 
@@ -380,7 +430,7 @@ function gv(c){return db.variedades.find(v=>v.codigo===c);}
 function pad(d){if(!d)return'';const[y,m,dd]=d.split('-');return dd+m;}
 function addD(ds,n){const d=new Date(ds);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 function fmt(ds){if(!ds)return'';const[y,m,d]=ds.split('-');return d+'/'+m+'/'+y;}
-const hoy=()=>new Date().toISOString().slice(0,10);
+const hoy=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 
 function toast(m,dur=2400){
   const t=document.getElementById('toast');
@@ -393,7 +443,7 @@ function setScreen(id,btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('s-'+id).classList.add('active');
   if(btn)btn.classList.add('active');
-  ({hoy:renderHoy,sembrar:poblarVarSel,cosechar:renderCosechar,encurso:renderEnCurso,resumen:renderResumen,catalogo:renderCatalogo,limpieza:renderLimpieza}[id]||(() =>{}))();
+  ({hoy:renderHoy,sembrar:poblarVarSel,cosechar:renderCosechar,encurso:renderEnCurso,resumen:renderResumen,catalogo:renderCatalogo,limpieza:renderLimpieza,semillas:renderSemillas}[id]||(() =>{}))();
 }
 
 async function syncSheet(payload){
@@ -407,86 +457,124 @@ async function syncSheet(payload){
 }
 
 // ── HOY ──────────────────────────────────────
-let hoyState = []; // [{codigo,nombre,bdj,bdjOriginal,activa,nota,id}]
+// hoyState: [{uid,codigo,nombre,bdj,bdjOriginal,activa,nota,obs,id,yaRegistrada,origen:'plantilla'|'añadida',obsOpen}]
+let hoyState = [], hoyFecha = null, hoyEliminadas = 0, hoyUid = 0;
 
-function renderHoy(){
+function hoyItem(codigo,bdj,nota,origen){
+  const v = gv(codigo), fecha = hoy();
+  const id = codigo+'-'+pad(fecha)+(nota?'-'+nota:'');
+  return {uid:++hoyUid,codigo,nombre:v?v.nombre:codigo,bdj,bdjOriginal:origen==='plantilla'?bdj:null,
+    activa:true,nota:nota||'',obs:'',id,origen,obsOpen:false,
+    yaRegistrada:db.tandas.some(t=>t.id===id&&t.fechaSiembra===fecha)};
+}
+
+function renderHoy(forzar){
   const fecha = hoy();
   const diaSemana = new Date().getDay();
   const plantillaDia = db.plantilla[diaSemana] || [];
+  document.getElementById('hoy-sync-log').innerHTML = '';
 
-  const header = document.getElementById('hoy-header');
-  const lista = document.getElementById('hoy-lista');
-  const actions = document.getElementById('hoy-actions');
-  const syncLog = document.getElementById('hoy-sync-log');
-  syncLog.innerHTML = '';
-
-  header.innerHTML = `
-    <div class="day-header">${DIAS[diaSemana]} ${fmt(fecha)}</div>
-    <div class="day-sub">${plantillaDia.length ? plantillaDia.length+' siembras en plantilla' : 'Sin plantilla para hoy'}</div>`;
-
-  if(!plantillaDia.length){
-    lista.innerHTML = `<div class="hoy-no-plantilla"><div>🌱</div><p>No hay plantilla para el ${DIAS[diaSemana]}.<br>Usa "Sembrar" para registrar manualmente.</p></div>`;
-    actions.style.display='none';
-    document.getElementById('hoy-progress').style.display='none';
-    return;
+  // Conservar los cambios del día al cambiar de pantalla
+  if(forzar || hoyFecha !== fecha){
+    hoyFecha = fecha; hoyEliminadas = 0;
+    hoyState = plantillaDia.map(p=>hoyItem(p.codigo,p.bdj,p.nota,'plantilla'));
+  } else {
+    hoyState.forEach(h=>{h.yaRegistrada = db.tandas.some(t=>t.id===h.id&&t.fechaSiembra===fecha);});
   }
 
-  // Verificar si ya se registraron siembras hoy
-  const yaRegistradas = db.tandas.filter(t=>t.fechaSiembra===fecha);
-
-  hoyState = plantillaDia.map((p,i)=>{
-    const v = gv(p.codigo);
-    const id = p.codigo+'-'+pad(fecha)+(p.nota?'-'+p.nota:'');
-    return {
-      codigo:p.codigo,
-      nombre:v?v.nombre:p.codigo,
-      bdj:p.bdj,
-      bdjOriginal:p.bdj,
-      activa:true,
-      nota:p.nota||'',
-      id,
-      yaRegistrada: yaRegistradas.some(t=>t.id===id)
-    };
-  });
-
+  document.getElementById('hoy-header').innerHTML = `
+    <div class="day-header">${DIAS[diaSemana]} ${fmt(fecha)}</div>
+    <div class="day-sub">${plantillaDia.length ? plantillaDia.length+' siembras en plantilla' : 'Sin plantilla para hoy'}</div>`;
+  poblarHoyAdd();
   renderHoyLista();
-  actions.style.display='block';
-  document.getElementById('hoy-progress').style.display='block';
-  updateProgress();
 }
+
+function poblarHoyAdd(){
+  const s = document.getElementById('hoy-add-var');
+  s.innerHTML = '<option value="">— Variedad —</option>' + db.variedades.map(v=>`<option value="${v.codigo}">${v.nombre}</option>`).join('');
+  document.getElementById('hoy-add-dest').innerHTML = '<option value="">Destino: general</option>' +
+    db.compuestos.map(c=>`<option value="${c.codigo}">Para ${c.codigo}</option>`).join('');
+}
+
+function addHoyItem(){
+  const cod = document.getElementById('hoy-add-var').value;
+  const bdj = parseInt(document.getElementById('hoy-add-bdj').value);
+  const dest = document.getElementById('hoy-add-dest').value;
+  if(!cod || !(bdj>0)){toast('Elige variedad y nº de bandejas');return;}
+  const it = hoyItem(cod,bdj,dest,'añadida');
+  if(hoyState.some(h=>h.id===it.id)){toast('Ya está en la lista de hoy ('+it.id+')');return;}
+  hoyState.push(it);
+  document.getElementById('hoy-add-var').value='';
+  document.getElementById('hoy-add-bdj').value='';
+  document.getElementById('hoy-add-dest').value='';
+  renderHoyLista();
+  toast(it.nombre+' añadida a hoy');
+}
+
+function quitarHoyItem(i){
+  const it = hoyState[i];
+  if(it.yaRegistrada){toast('Ya está registrada; para corregirla usa "En curso"');return;}
+  if(it.origen==='plantilla') hoyEliminadas++;
+  hoyState.splice(i,1);
+  renderHoyLista();
+}
+
+function hoyHayCambios(){
+  return hoyEliminadas>0 || hoyState.some(h=>h.origen==='añadida' || (h.bdjOriginal!==null && h.bdj!==h.bdjOriginal));
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
 
 function renderHoyLista(){
   const lista = document.getElementById('hoy-lista');
+  const actions = document.getElementById('hoy-actions');
   const fecha = hoy();
-  lista.innerHTML = hoyState.map((item,i)=>{
-    const v = gv(item.codigo);
-    const sinLote = !v||!v.lote;
-    const modificado = item.bdj !== item.bdjOriginal;
-    return `<div class="hoy-row${!item.activa?' disabled':''}" id="hoy-row-${i}">
-      <div class="hoy-check${item.activa?' on':''}" onclick="toggleHoyItem(${i})">
-        <span class="hoy-check-mark">✓</span>
-      </div>
-      <div class="hoy-info">
-        <div class="hoy-name">${item.nombre}${item.nota?' <span style="font-size:10px;color:#888">('+item.nota+')</span>':''}</div>
-        <div class="hoy-id">${item.codigo}-${pad(fecha)}</div>
-        ${sinLote?'<div style="font-size:10px;color:#c0392b;margin-top:2px">⚠ Sin lote activo</div>':''}
-        ${modificado?`<div class="hoy-modified">✎ Modificado (orig: ${item.bdjOriginal})</div>`:''}
-        ${item.yaRegistrada?'<div style="font-size:10px;color:#1a6b3c;margin-top:2px">✓ Ya registrada hoy</div>':''}
-      </div>
-      <div class="hoy-bdj">
-        <input type="number" value="${item.bdj}" 
-          onchange="updateHoyBdj(${i},this.value)"
-          onclick="event.stopPropagation()"
-          ${!item.activa?'disabled':''}>
-      </div>
-    </div>`;
-  }).join('');
+  if(!hoyState.length){
+    lista.innerHTML = `<div class="hoy-no-plantilla"><div>🌱</div><p>No hay siembras previstas para hoy.<br>Añade variedades abajo o usa "Sembrar".</p></div>`;
+    document.getElementById('hoy-progress').style.display='none';
+  } else {
+    document.getElementById('hoy-progress').style.display='block';
+    lista.innerHTML = hoyState.map((item,i)=>{
+      const v = gv(item.codigo);
+      const sinLote = !v||!v.lote;
+      const modificado = item.bdjOriginal!==null && item.bdj !== item.bdjOriginal;
+      return `<div class="hoy-row${!item.activa?' disabled':''}" style="flex-wrap:wrap">
+        <div class="hoy-check${item.activa?' on':''}" onclick="toggleHoyItem(${i})"><span class="hoy-check-mark">✓</span></div>
+        <div class="hoy-info">
+          <div class="hoy-name">${item.nombre}${item.nota?' <span style="font-size:10px;color:#888">('+item.nota+')</span>':''}</div>
+          <div class="hoy-id">${item.id}</div>
+          ${item.origen==='añadida'?'<div style="font-size:10px;color:#1a4a8a;margin-top:1px">＋ Añadida hoy</div>':''}
+          ${sinLote?'<div style="font-size:10px;color:#c0392b;margin-top:2px">⚠ Sin lote activo</div>':''}
+          ${modificado?`<div class="hoy-modified">✎ Modificado (orig: ${item.bdjOriginal})</div>`:''}
+          ${item.yaRegistrada?'<div style="font-size:10px;color:#1a6b3c;margin-top:2px">✓ Ya registrada hoy</div>':''}
+          ${item.obs&&!item.obsOpen?`<div style="font-size:11px;color:#555;margin-top:2px">📝 ${esc(item.obs)}</div>`:''}
+        </div>
+        <div class="hoy-bdj">
+          <input type="number" value="${item.bdj}" onchange="updateHoyBdj(${i},this.value)" onclick="event.stopPropagation()" ${!item.activa||item.yaRegistrada?'disabled':''}>
+        </div>
+        <button class="icon-btn" title="Observación" onclick="toggleHoyObs(${i})" style="padding:6px 4px;color:${item.obs?'#1a6b3c':'#aaa'}">📝</button>
+        <button class="icon-btn" title="Quitar de hoy" onclick="quitarHoyItem(${i})" style="padding:6px 4px;color:#c0392b">✕</button>
+        ${item.obsOpen?`<textarea style="flex-basis:100%;margin-top:8px;min-height:44px;font-size:13px" placeholder="Observación de esta siembra (ej: sustrato nuevo, semilla remojada 6 h...)" oninput="hoyState[${i}].obs=this.value">${esc(item.obs)}</textarea>`:''}
+      </div>`;
+    }).join('');
+  }
+  actions.style.display='block';
+  // Opción de guardar en plantilla solo si hay cambios
+  const wrap = document.getElementById('hoy-save-tpl-wrap');
+  wrap.style.display = hoyHayCambios() ? 'flex' : 'none';
+  document.getElementById('hoy-save-tpl-txt').textContent = 'Guardar estos cambios en la plantilla de los '+DIAS[new Date().getDay()].toLowerCase();
+  updateProgress();
+}
+
+function toggleHoyObs(i){
+  hoyState[i].obsOpen = !hoyState[i].obsOpen;
+  hoyState[i].obs = (hoyState[i].obs||'').trim();
+  renderHoyLista();
 }
 
 function toggleHoyItem(i){
   hoyState[i].activa = !hoyState[i].activa;
   renderHoyLista();
-  updateProgress();
 }
 
 function updateHoyBdj(i,val){
@@ -498,71 +586,60 @@ function updateHoyBdj(i,val){
 function updateProgress(){
   const activas = hoyState.filter(h=>h.activa).length;
   const total = hoyState.length;
-  const pct = total ? (activas/total*100) : 0;
-  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('progress-fill').style.width = (total ? activas/total*100 : 0)+'%';
 }
 
 async function confirmarHoy(){
   const fecha = hoy();
   const activas = hoyState.filter(h=>h.activa && !h.yaRegistrada);
-  if(!activas.length){toast('No hay siembras nuevas que registrar');return;}
+  const guardarTpl = hoyHayCambios() && document.getElementById('hoy-save-tpl').checked;
+  if(!activas.length && !guardarTpl){toast('No hay siembras nuevas que registrar');return;}
 
-  // Verificar lotes
   const sinLote = activas.filter(h=>{const v=gv(h.codigo);return !v||!v.lote;});
-  if(sinLote.length){
-    toast('Faltan lotes activos en: '+sinLote.map(h=>h.codigo).join(', '));
-    return;
-  }
+  if(sinLote.length){toast('Faltan lotes activos en: '+sinLote.map(h=>h.codigo).join(', '));return;}
 
-  const btn = document.querySelector('#s-hoy .btn-primary');
+  const btn = document.querySelector('#hoy-actions .btn-primary');
   btn.textContent='Registrando...'; btn.disabled=true;
-
   const syncLog = document.getElementById('hoy-sync-log');
   syncLog.innerHTML='';
   let guardadas=0, errores=0;
 
   for(const item of activas){
     const v = gv(item.codigo);
-    const id = item.codigo+'-'+pad(fecha)+(item.nota?'-'+item.nota:'');
-    const tanda = {
-      id, codigo:item.codigo, nombre:item.nombre,
+    const obs = [item.nota?'Destino '+item.nota:'', (item.obs||'').trim()].filter(Boolean).join(' · ');
+    db.tandas.push({
+      id:item.id, codigo:item.codigo, nombre:item.nombre,
       proveedor:v.proveedor, lote:v.lote, lote2:v.lote2||null,
-      bandejas:item.bdj, fechaSiembra:fecha,
-      fechaCosechaEst:addD(fecha,v.dias),
-      cerrada:false, parcial:false, obs:item.nota||null
-    };
-    db.tandas.push(tanda);
-
-    const ok = await syncSheet({tipo:'siembra',fecha,idTanda:id,variedad:v.nombre,
-      proveedor:v.proveedor,lote:v.lote,lote2:v.lote2||'',bandejas:item.bdj,obs:item.nota||''});
-
+      bandejas:item.bdj, fechaSiembra:fecha, fechaCosechaEst:addD(fecha,v.dias),
+      cerrada:false, parcial:false, obs:obs||null
+    });
+    consumirLocal(item.codigo,item.bdj);
+    const ok = await syncSheet({tipo:'siembra',fecha,idTanda:item.id,variedad:v.nombre,
+      proveedor:v.proveedor,lote:v.lote,lote2:v.lote2||'',bandejas:item.bdj,obs});
     const div = document.createElement('div');
     div.className='sync-row';
-    div.innerHTML=`<div class="dot ${ok?'dot-ok':'dot-err'}"></div><span style="font-size:11px">${id} · ${item.bdj} bdj — ${ok?'✓ Guardado':'⚠ Error sync (guardado local)'}</span>`;
+    div.innerHTML=`<div class="dot ${ok?'dot-ok':'dot-err'}"></div><span style="font-size:11px">${item.id} · ${item.bdj} bdj — ${ok?'✓ Guardado':'⚠ Error sync (guardado local)'}</span>`;
     syncLog.appendChild(div);
     if(ok)guardadas++;else errores++;
   }
 
-  save();
-
-  // Actualizar plantilla si hay cambios de cantidad
-  const diaSemana = new Date().getDay();
-  const plantillaDia = db.plantilla[diaSemana];
-  let plantillaModificada = false;
-  hoyState.forEach((item,i)=>{
-    if(item.activa && item.bdj !== item.bdjOriginal && i < plantillaDia.length){
-      plantillaDia[i].bdj = item.bdj;
-      plantillaModificada = true;
-    }
-  });
-  if(plantillaModificada){
-    save();
-    syncLog.innerHTML += '<div class="sync-row"><div class="dot dot-ok"></div><span style="font-size:11px">Plantilla actualizada con nuevas cantidades</span></div>';
+  if(guardarTpl){
+    // La plantilla del día pasa a ser la lista actual (las desmarcadas se mantienen; las quitadas con ✕ no)
+    const d = new Date().getDay();
+    db.plantilla[d] = hoyState.map(h=>{const e={codigo:h.codigo,bdj:h.bdj};if(h.nota)e.nota=h.nota;return e;});
+    syncLog.innerHTML += `<div class="sync-row"><div class="dot dot-ok"></div><span style="font-size:11px">Plantilla de los ${DIAS[d].toLowerCase()} actualizada</span></div>`;
   }
+  save();
+  if(guardarTpl) guardarConfigSemillas(true);
 
   btn.textContent='Confirmar y registrar siembras'; btn.disabled=false;
-  toast(`${guardadas} siembras registradas${errores?' ('+errores+' errores sync)':''}`);
-  renderHoy();
+  document.getElementById('hoy-save-tpl').checked=false;
+  if(activas.length) toast(`${guardadas} siembras registradas${errores?' ('+errores+' errores sync)':''}`);
+  else toast('Plantilla actualizada');
+  // Tras guardar, la lista vuelve a compararse con la plantilla (que puede haber cambiado)
+  const log = syncLog.innerHTML;
+  if(guardarTpl) renderHoy(true); else renderHoy();
+  syncLog.innerHTML = log;
 }
 
 // ── SEMBRAR ──────────────────────────────────
@@ -635,7 +712,7 @@ async function registrarSiembra(){
   const id=cod+'-'+pad(fecha);
   db.tandas.push({id,codigo:cod,nombre:v.nombre,proveedor:v.proveedor,lote:v.lote,lote2:v.lote2||null,
     bandejas:bdj,fechaSiembra:fecha,fechaCosechaEst:addD(fecha,v.dias),cerrada:false,parcial:false,obs:obs||null});
-  save();toast('Tanda '+id+' registrada');
+  consumirLocal(cod,bdj);save();toast('Tanda '+id+' registrada');
   ['var-sel','bandejas','obs'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('id-preview').textContent='—';
   document.getElementById('cos-hint').textContent='Selecciona variedad y fecha';
@@ -798,16 +875,41 @@ async function registrarCosecha(parcial){
 }
 
 // ── EN CURSO ──────────────────────────────────
-let encExpandedIdx = null;
+let encExpandedIdx = null, vencPanelOpen = false;
+const MOTIVOS_ELIM = [
+  'Cosechada sin registrar',
+  'Descartada (calidad / plaga / hongos)',
+  'Error de registro (no se sembró)',
+  'Otro'
+];
+function diasA(t){return Math.ceil((new Date(t.fechaCosechaEst)-new Date(hoy()))/86400000);}
+function motivoSelect(id){return `<select id="${id}" style="margin-bottom:8px">${MOTIVOS_ELIM.map(m=>`<option>${m}</option>`).join('')}</select>`;}
 
 function renderEnCurso(){
   const activas=db.tandas.filter(t=>!t.cerrada).sort((a,b)=>new Date(a.fechaCosechaEst)-new Date(b.fechaCosechaEst));
-  const msg=document.getElementById('msg-enc'),cont=document.getElementById('lista-enc'),h=hoy();
+  const msg=document.getElementById('msg-enc'),cont=document.getElementById('lista-enc');
+  const vencidas=activas.filter(t=>diasA(t)<0);
+  const vp=document.getElementById('venc-panel');
+  if(!vencidas.length){vp.innerHTML='';vencPanelOpen=false;}
+  else vp.innerHTML=`<div class="card" style="border:1px solid #f5c6c6">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;font-size:14px;font-weight:600;color:#8a1a1a">⚠ ${vencidas.length} tanda${vencidas.length>1?'s':''} vencida${vencidas.length>1?'s':''}</div>
+        <button onclick="vencPanelOpen=!vencPanelOpen;renderEnCurso()" style="padding:8px 12px;border-radius:8px;border:1px solid #e0b4b4;background:#fff;color:#8a1a1a;font-weight:600;font-size:13px">${vencPanelOpen?'Cerrar':'Eliminar…'}</button>
+      </div>
+      ${vencPanelOpen?`
+      <p style="font-size:12px;color:#888;margin:10px 0 6px">Desmarca las que sigan en producción. Quedarán registradas en "Incidencias" con el motivo.</p>
+      ${vencidas.map(t=>{const ri=db.tandas.indexOf(t);return `<label style="display:flex;align-items:center;gap:8px;margin:0;padding:6px 0;border-bottom:1px solid #f0f0f0;color:#1a1a1a">
+        <input type="checkbox" class="venc-chk" data-ri="${ri}" checked style="width:18px;height:18px;accent-color:#c0392b">
+        <span style="flex:1;font-size:13px"><span style="font-family:monospace;font-weight:600">${t.id}</span> · ${t.bandejas} bdj<br><span style="font-size:11px;color:#888">Est. ${fmt(t.fechaCosechaEst)} · ${Math.abs(diasA(t))}d vencida</span></span></label>`;}).join('')}
+      <label>Motivo</label>${motivoSelect('venc-motivo')}
+      <input type="text" id="venc-nota" placeholder="Nota (opcional)">
+      <button class="btn" style="background:#c0392b;color:#fff" onclick="eliminarVencidas()">Eliminar seleccionadas</button>`:''}
+    </div>`;
   if(!activas.length){msg.style.display='block';cont.innerHTML='';return;}
   msg.style.display='none';
   cont.innerHTML=activas.map(t=>{
     const ri=db.tandas.indexOf(t);
-    const dl=Math.ceil((new Date(t.fechaCosechaEst)-new Date(h))/86400000);
+    const dl=diasA(t);
     const badge=dl<0?`<span class="badge b-late">${Math.abs(dl)}d vencida</span>`:dl===0?'<span class="badge b-warn">hoy</span>':dl<=2?`<span class="badge b-warn">${dl}d</span>`:`<span class="badge b-ok">${dl}d</span>`;
     const expanded = encExpandedIdx === ri;
     return `<div style="border-bottom:1px solid #f0f0f0">
@@ -817,6 +919,7 @@ function renderEnCurso(){
           <div class="row-sub">${t.bandejas} bdj · ${t.nombre}</div>
           <div class="row-sub">Lote: ${t.lote||'—'}${t.lote2?' + '+t.lote2:''} · ${t.proveedor||'—'}</div>
           <div class="row-sub">Siembra ${fmt(t.fechaSiembra)} · Est. ${fmt(t.fechaCosechaEst)}</div>
+          ${t.obs?`<div class="row-sub">📝 ${esc(t.obs)}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           ${badge}
@@ -835,6 +938,10 @@ function renderEnCurso(){
           <button onclick="guardarModificacion(${ri})" style="flex:1;padding:11px;background:#1a6b3c;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer">Guardar cambio</button>
           <button onclick="toggleEncurso(null)" style="padding:11px 16px;background:#fff;border:1px solid #d0d0d0;border-radius:9px;font-size:14px;cursor:pointer">Cancelar</button>
         </div>
+        <div class="divider"></div>
+        <p style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Eliminar tanda</p>
+        ${motivoSelect('enc-motivo-'+ri)}
+        <button onclick="eliminarTanda(${ri})" style="width:100%;padding:11px;background:#fff;color:#c0392b;border:1px solid #e0b4b4;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer">Eliminar tanda</button>
       </div>` : ''}
     </div>`;
   }).join('');
@@ -842,6 +949,47 @@ function renderEnCurso(){
 
 function toggleEncurso(idx){
   encExpandedIdx = encExpandedIdx === idx ? null : idx;
+  renderEnCurso();
+}
+
+// Elimina tandas de "en curso" dejando constancia en la hoja Incidencias (bandejas → 0).
+// No se borra la fila de Siembras: la trazabilidad de lo sembrado se conserva.
+async function eliminarLista(indices, motivo, nota){
+  const tandas = indices.map(i=>db.tandas[i]).filter(Boolean);
+  const fecha = hoy();
+  tandas.forEach(t=>{t.cerrada=true;t.eliminada=true;});
+  save();
+  let err=0;
+  for(const t of tandas){
+    const ok = await syncSheet({tipo:'incidencia',fecha,tandaId:t.id,variedad:t.nombre,
+      bdjAntes:t.bandejas,bdjDespues:0,reduccion:t.bandejas,
+      nota:'ELIMINADA — '+motivo+(nota?' · '+nota:'')});
+    if(!ok)err++;
+  }
+  return {n:tandas.length, err};
+}
+
+async function eliminarTanda(ri){
+  const t=db.tandas[ri]; if(!t)return;
+  const motivo=document.getElementById('enc-motivo-'+ri).value;
+  const nota=document.getElementById('enc-nota-'+ri).value.trim();
+  if(!confirm(`¿Eliminar ${t.id} (${t.bandejas} bdj)?\nMotivo: ${motivo}`))return;
+  encExpandedIdx=null;
+  const r=await eliminarLista([ri],motivo,nota);
+  toast(r.err?'Eliminada (error al sincronizar)':'Tanda '+t.id+' eliminada');
+  renderEnCurso();
+}
+
+async function eliminarVencidas(){
+  const idx=[...document.querySelectorAll('.venc-chk')].filter(c=>c.checked).map(c=>parseInt(c.dataset.ri));
+  if(!idx.length){toast('No hay ninguna seleccionada');return;}
+  const motivo=document.getElementById('venc-motivo').value;
+  const nota=document.getElementById('venc-nota').value.trim();
+  if(!confirm(`¿Eliminar ${idx.length} tanda${idx.length>1?'s':''} vencida${idx.length>1?'s':''}?\nMotivo: ${motivo}`))return;
+  vencPanelOpen=false;
+  toast('Eliminando…');
+  const r=await eliminarLista(idx,motivo,nota);
+  toast(`${r.n} eliminada${r.n>1?'s':''}${r.err?' ('+r.err+' sin sincronizar)':''}`);
   renderEnCurso();
 }
 
@@ -927,7 +1075,7 @@ function renderPlantillaEditor(){
   cont.innerHTML=html;
 }
 
-function guardarPlantilla(){save();toast('Plantilla guardada');}
+function guardarPlantilla(){save();guardarConfigSemillas(true);toast('Plantilla guardada');}
 
 function editV(i){const v=db.variedades[i];editVi=i;document.getElementById('vf-nombre').value=v.nombre;document.getElementById('vf-codigo').value=v.codigo;document.getElementById('vf-dias').value=v.dias;document.getElementById('vf-prov').value=v.proveedor||'';document.getElementById('vf-lote').value=v.lote||'';document.getElementById('vf-lote2').value=v.lote2||'';document.getElementById('vf-title').textContent='Editar variedad';document.getElementById('btn-cancel-var').style.display='block';document.getElementById('vf-card').scrollIntoView({behavior:'smooth',block:'nearest'});}
 function cancelVar(){editVi=null;['vf-nombre','vf-codigo','vf-dias','vf-prov','vf-lote','vf-lote2'].forEach(i=>document.getElementById(i).value='');document.getElementById('vf-title').textContent='Nueva variedad';document.getElementById('btn-cancel-var').style.display='none';}
@@ -1029,6 +1177,115 @@ async function registrarLimpieza(){
   }
 }
 
+
+// ── SEMILLAS ──────────────────────────────────
+const MARGEN_DIAS = 7;
+function plazoDef(v){return v.proveedor==='MP Seeds'?9:1;}
+function bdjSemanaPlantilla(cod){
+  let n=0;Object.values(db.plantilla||{}).forEach(dia=>(dia||[]).forEach(p=>{if(p.codigo===cod)n+=Number(p.bdj)||0;}));return n;
+}
+// Recalcula días restantes en local (el servidor hace lo mismo y además usa la media real si no hay plantilla)
+function calcSemilla(v){
+  const gpb=Number(v.gpb)||0, bs=bdjSemanaPlantilla(v.codigo);
+  const gdia=gpb*bs/7 || Number(v.gdia)||0;
+  const plazo=v.plazo===''||v.plazo==null?plazoDef(v):Number(v.plazo);
+  if(v.stock===''||v.stock==null) return {estado:'sin-stock',gdia,plazo,bs};
+  if(!gpb) return {estado:'sin-gpb',gdia,plazo,bs};
+  if(!gdia) return {estado:'sin-consumo',gdia,plazo,bs};
+  const dias=Math.floor(v.stock/gdia);
+  const nivel=dias<=plazo?2:dias<=plazo+MARGEN_DIAS?1:0;
+  return {estado:'ok',gdia,plazo,bs,dias,nivel,agota:addD(hoy(),dias),pedir:addD(hoy(),dias-plazo-MARGEN_DIAS)};
+}
+function consumirLocal(cod,bdj){
+  const v=gv(cod);if(!v||!v.gpb||v.stock===''||v.stock==null)return;
+  v.stock=Math.max(0,Math.round((v.stock-v.gpb*bdj)*10)/10);
+}
+
+function renderSemillas(){
+  const orden=db.variedades.map(v=>({v,c:calcSemilla(v)})).sort((a,b)=>{
+    const k=x=>x.c.estado==='ok'?(2-x.c.nivel)*1000+x.c.dias:9000;return k(a)-k(b);});
+  document.getElementById('sem-lista').innerHTML=orden.map(({v,c})=>{
+    const i=db.variedades.indexOf(v);
+    let badge,info;
+    if(c.estado==='ok'){
+      badge=c.nivel===2?'<span class="badge b-late">Urgente</span>':c.nivel===1?'<span class="badge b-warn">Pedir ya</span>':'<span class="badge b-ok">OK</span>';
+      info=`${v.stock} g · ~${c.dias} días · se acaba ${fmt(c.agota)}<br>${c.nivel?'<b>Pedir ya</b>':'Pedir antes del '+fmt(c.pedir)}`;
+    } else {
+      badge='<span class="badge" style="background:#f0f0f0;color:#888">Sin datos</span>';
+      info=c.estado==='sin-stock'?'Sin stock registrado — registra la próxima entrada'
+        :c.estado==='sin-gpb'?`${v.stock} g · falta g/bandeja`
+        :`${v.stock} g · no está en la plantilla (se usará la media real de siembras)`;
+    }
+    return `<div class="row" style="flex-wrap:wrap;gap:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600">${v.nombre} <span style="font-size:11px;color:#aaa;font-family:monospace">${v.codigo}</span></div>
+        <div class="row-sub">${info}</div>
+        <div class="row-sub">${c.bs?c.bs+' bdj/semana en plantilla':'0 bdj/semana en plantilla'}${c.gdia?' · '+(Math.round(c.gdia*10)/10)+' g/día':''}</div>
+      </div>${badge}
+      <div style="display:flex;gap:8px;flex-basis:100%">
+        <div style="flex:1"><span style="font-size:11px;color:#888">g / bandeja</span>
+          <input type="number" min="0" step="0.1" value="${v.gpb??''}" placeholder="ej: 25" onchange="setSemCampo(${i},'gpb',this.value)" style="padding:7px 10px"></div>
+        <div style="flex:1"><span style="font-size:11px;color:#888">Plazo entrega (días)</span>
+          <input type="number" min="0" value="${v.plazo===''||v.plazo==null?plazoDef(v):v.plazo}" onchange="setSemCampo(${i},'plazo',this.value)" style="padding:7px 10px"></div>
+      </div>
+    </div>`;
+  }).join('');
+  const opts='<option value="">— Seleccionar —</option>'+db.variedades.map(v=>`<option value="${v.codigo}">${v.nombre}</option>`).join('');
+  ['se-var','sa-var'].forEach(id=>{const s=document.getElementById(id),val=s.value;s.innerHTML=opts;s.value=val;});
+  const f=document.getElementById('se-fecha');if(!f.value)f.value=hoy();
+}
+
+let semDirty=false;
+function setSemCampo(i,campo,val){
+  db.variedades[i][campo]=val===''?'':Number(val);semDirty=true;save();renderSemillas();
+}
+
+function itemsConfigSemillas(){
+  return db.variedades.map(v=>({codigo:v.codigo,nombre:v.nombre,gpb:v.gpb??'',
+    plazo:v.plazo===''||v.plazo==null?plazoDef(v):v.plazo,bdjSemana:bdjSemanaPlantilla(v.codigo)}));
+}
+async function guardarConfigSemillas(silencioso){
+  const ok=await syncSheet({tipo:'semillas_config',items:itemsConfigSemillas()});
+  semDirty=false;
+  if(!silencioso)toast(ok?'Densidades y plazos guardados':'Error al sincronizar');
+}
+
+function onSemEntradaVar(){
+  const v=gv(document.getElementById('se-var').value);
+  if(v)document.getElementById('se-prov').value=v.proveedor||'';
+}
+
+async function registrarEntradaSemillas(){
+  const cod=document.getElementById('se-var').value, g=parseFloat(document.getElementById('se-g').value);
+  const fecha=document.getElementById('se-fecha').value, prov=document.getElementById('se-prov').value;
+  const lote=document.getElementById('se-lote').value.trim(), lote2=document.getElementById('se-lote2').value.trim();
+  const activo=document.getElementById('se-activo').checked;
+  if(!cod||!(g>0)||!fecha||!prov||!lote){toast('Completa variedad, gramos, fecha, proveedor y lote');return;}
+  const v=gv(cod);
+  v.stock=Math.round(((v.stock===''||v.stock==null?0:Number(v.stock))+g)*10)/10;
+  if(activo){v.proveedor=prov;v.lote=lote;v.lote2=lote2;}
+  save();
+  const ok=await syncSheet({tipo:'semillas_entrada',fecha,codigo:cod,nombre:v.nombre,gramos:g,proveedor:prov,lote,lote2});
+  if(activo)syncSheet({tipo:'lote_activo',codigo:cod,proveedor:prov,lote,lote2});
+  ['se-g','se-lote','se-lote2'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('se-activo').checked=false;
+  toast(ok?`+${g} g de ${v.nombre}${activo?' · lote activo actualizado':''}`:'Guardado local — error al sincronizar');
+  renderSemillas();
+}
+
+async function ajustarStockSemillas(){
+  const cod=document.getElementById('sa-var').value, g=parseFloat(document.getElementById('sa-g').value);
+  const nota=document.getElementById('sa-nota').value.trim();
+  if(!cod||isNaN(g)||g<0){toast('Elige variedad y gramos');return;}
+  const v=gv(cod);
+  if(!confirm(`¿Fijar el stock de ${v.nombre} en ${g} g?`))return;
+  v.stock=g;save();
+  const ok=await syncSheet({tipo:'semillas_ajuste',fecha:hoy(),codigo:cod,nombre:v.nombre,gramos:g,nota});
+  document.getElementById('sa-g').value='';document.getElementById('sa-nota').value='';
+  toast(ok?'Stock ajustado':'Guardado local — error al sincronizar');
+  renderSemillas();
+}
+
 // ── SYNC DESDE SHEET ─────────────────────────
 async function cargarDesdeSheet() {
   const loadDiv = document.createElement('div');
@@ -1050,6 +1307,16 @@ async function cargarDesdeSheet() {
     const data = await res.json();
 
     if (data.ok) {
+      // Stock y configuración de semillas (el Sheet manda)
+      const sem = data.semillas || {};
+      const sinConfig = !Object.keys(sem).length;
+      db.variedades.forEach(v => {
+        const x = sem[v.codigo]; if (!x) return;
+        v.gpb = x.gpb; v.plazo = x.plazo; v.stock = x.stock; v.gdia = x.gdia;
+      });
+      // Primera vez: enviar plantilla y plazos por defecto para que el Sheet pueda calcular
+      if (sinConfig && data.semillas) setTimeout(() => guardarConfigSemillas(true), 1500);
+
       // Actualizar lotes activos en variedades
       db.variedades = db.variedades.map(v => {
         const loteInfo = data.lotes[v.codigo];

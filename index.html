@@ -113,7 +113,7 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
   #lista-enc{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 28px}
   /* Catálogo: dos columnas (lista | formulario), plantilla a lo ancho */
   #s-catalogo.active{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
-  #s-catalogo .card:last-child{grid-column:1/-1}
+  #tpl-card{grid-column:1/-1}
   #plantilla-editor{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 24px}
   /* Semillas: lista en rejilla, entrada y ajuste lado a lado */
   #s-semillas.active{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
@@ -281,6 +281,16 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
 
 <!-- ── CATÁLOGO ───────────────────────────── -->
 <div class="screen" id="s-catalogo">
+  <div class="card" id="tpl-card">
+    <p class="sec-title">Plantilla semanal</p>
+    <p style="font-size:12px;color:#888;margin-bottom:12px">Lo que se siembra cada día. Se usa en "Hoy" y para calcular el consumo de semillas. Se comparte con todos los dispositivos al guardar.</p>
+    <div id="plantilla-editor"></div>
+    <p id="tpl-estado" style="font-size:12px;color:#e67e22;font-weight:600;margin-top:8px"></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="flex:2 1 220px" onclick="guardarPlantilla()">Guardar plantilla</button>
+      <button class="btn btn-secondary" style="flex:1 1 140px;margin-top:12px" onclick="descartarPlantilla()">Descartar cambios</button>
+    </div>
+  </div>
   <div class="card">
     <p class="sec-title">Variedades y lotes activos</p>
     <div id="cat-vars"></div>
@@ -311,12 +321,6 @@ textarea{width:100%;padding:10px 12px;font-size:14px;background:#f8f8f8;border:1
     <button class="btn btn-secondary" onclick="addCfComp()" style="margin-top:8px">+ Añadir variedad</button>
     <button class="btn btn-primary" onclick="guardarComp()">Guardar producto</button>
     <button class="btn btn-secondary" id="btn-cancel-comp" style="display:none" onclick="cancelComp()">Cancelar</button>
-  </div>
-  <div class="card">
-    <p class="sec-title">Plantilla semanal</p>
-    <p style="font-size:12px;color:#888;margin-bottom:12px">Edita las cantidades estándar por día. Se usan en la pantalla "Hoy".</p>
-    <div id="plantilla-editor"></div>
-    <button class="btn btn-primary" style="margin-top:12px" onclick="guardarPlantilla()">Guardar plantilla</button>
   </div>
 </div>
 
@@ -660,6 +664,8 @@ async function confirmarHoy(){
     // La plantilla del día pasa a ser la lista actual (las desmarcadas se mantienen; las quitadas con ✕ no)
     const d = new Date().getDay();
     db.plantilla[d] = hoyState.map(h=>{const e={codigo:h.codigo,bdj:h.bdj};if(h.nota)e.nota=h.nota;return e;});
+    tplDirty=false;tplDraft=null;
+    syncConfig({plantilla:db.plantilla});
     syncLog.innerHTML += `<div class="sync-row"><div class="dot dot-ok"></div><span style="font-size:11px">Plantilla de los ${DIAS[d].toLowerCase()} actualizada</span></div>`;
   }
   save();
@@ -1088,27 +1094,81 @@ function renderCatalogo(){
   cancelVar();cancelComp();renderCfComps();
 }
 
+// Editor de plantilla: se trabaja sobre un borrador y se aplica con "Guardar plantilla"
+let tplDraft=null, tplDirty=false;
+function tplClone(){return JSON.parse(JSON.stringify(db.plantilla||{}));}
 function renderPlantillaEditor(){
+  if(!tplDraft||!tplDirty) tplDraft=tplClone();
   const cont=document.getElementById('plantilla-editor');
+  const optsVar=db.variedades.map(v=>`<option value="${v.codigo}">${v.nombre}</option>`).join('');
+  const optsDest='<option value="">General</option>'+db.compuestos.map(c=>`<option value="${c.codigo}">Para ${c.codigo}</option>`).join('');
   let html='';
   [1,2,3,4,5,6,0].forEach(d=>{
-    const items=db.plantilla[d]||[];
-    html+=`<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#1a6b3c;margin-bottom:6px">${DIAS[d]}</div>`;
-    if(!items.length){html+='<p style="font-size:12px;color:#bbb;padding:4px 0">Sin siembras</p>';html+='</div>';return;}
+    const items=tplDraft[d]||[];
+    const total=items.reduce((a,p)=>a+(Number(p.bdj)||0),0);
+    html+=`<div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #f0f0f0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:700;color:#1a6b3c">${DIAS[d]}</span>
+        <span style="font-size:11px;color:#999">${items.length?total+' bdj':''}</span></div>`;
+    if(!items.length)html+='<p style="font-size:12px;color:#bbb;padding:2px 0 6px">Sin siembras</p>';
     items.forEach((p,i)=>{
       const v=gv(p.codigo);
-      html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="flex:1;font-size:13px">${v?v.nombre:p.codigo}${p.nota?' <span style="color:#aaa;font-size:11px">('+p.nota+')</span>':''}</span>
-        <input type="number" min="1" value="${p.bdj}" style="width:60px;padding:6px 8px;font-size:13px;border:1px solid #e0e0e0;border-radius:6px;background:#f8f8f8"
-          onchange="db.plantilla[${d}][${i}].bdj=parseInt(this.value)||${p.bdj}">
+      html+=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="flex:1;font-size:13px;min-width:0">${v?v.nombre:p.codigo}${p.nota?' <span style="color:#aaa;font-size:11px">('+p.nota+')</span>':''}</span>
+        <input type="number" min="1" value="${p.bdj}" style="width:58px;padding:6px 8px;font-size:13px"
+          onchange="tplSet(${d},${i},this.value)">
+        <button class="icon-btn" style="color:#c0392b;padding:4px 6px" onclick="tplQuitar(${d},${i})">✕</button>
       </div>`;
     });
-    html+='</div>';
+    html+=`<details style="margin-top:4px"><summary style="font-size:12px;color:#1a6b3c;cursor:pointer;font-weight:600">+ Añadir variedad</summary>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+        <select id="tpl-var-${d}" style="flex:1 1 100%;padding:7px 10px;font-size:13px"><option value="">— Variedad —</option>${optsVar}</select>
+        <input type="number" id="tpl-bdj-${d}" min="1" placeholder="Bdj" style="flex:1;padding:7px 10px;font-size:13px">
+        <select id="tpl-dest-${d}" style="flex:1;padding:7px 10px;font-size:13px">${optsDest}</select>
+        <button class="btn btn-secondary" style="flex:1 1 100%;margin-top:0;padding:8px;font-size:13px" onclick="tplAnadir(${d})">Añadir al ${DIAS[d].toLowerCase()}</button>
+      </div></details></div>`;
   });
   cont.innerHTML=html;
+  document.getElementById('tpl-estado').textContent=tplDirty?'Cambios sin guardar':'';
+}
+function tplMark(){tplDirty=true;renderPlantillaEditor();}
+function tplSet(d,i,val){const n=parseInt(val);if(n>0){tplDraft[d][i].bdj=n;}tplMark();}
+function tplQuitar(d,i){tplDraft[d].splice(i,1);tplMark();}
+function tplAnadir(d){
+  const cod=document.getElementById('tpl-var-'+d).value, bdj=parseInt(document.getElementById('tpl-bdj-'+d).value);
+  const dest=document.getElementById('tpl-dest-'+d).value;
+  if(!cod||!(bdj>0)){toast('Elige variedad y bandejas');return;}
+  tplDraft[d]=tplDraft[d]||[];
+  if(tplDraft[d].some(p=>p.codigo===cod&&(p.nota||'')===dest)){toast('Ya está en ese día; cambia la cantidad');return;}
+  const e={codigo:cod,bdj};if(dest)e.nota=dest;
+  tplDraft[d].push(e);tplMark();
+}
+function descartarPlantilla(){tplDirty=false;tplDraft=null;renderPlantillaEditor();toast('Cambios descartados');}
+function guardarPlantilla(){
+  db.plantilla=JSON.parse(JSON.stringify(tplDraft||db.plantilla));
+  tplDirty=false;save();
+  hoyFecha=null;                       // "Hoy" se rehace con la plantilla nueva
+  syncConfig({plantilla:db.plantilla});
+  guardarConfigSemillas(true);
+  renderPlantillaEditor();
+  toast('Plantilla guardada para todos los dispositivos');
 }
 
-function guardarPlantilla(){save();guardarConfigSemillas(true);toast('Plantilla guardada');}
+// ── Configuración compartida (plantilla + catálogo) ──
+function variedadesConfig(){return db.variedades.map(v=>({codigo:v.codigo,nombre:v.nombre,dias:v.dias}));}
+function syncConfig(partes){
+  return syncSheet({tipo:'config',por:navigator.userAgent.includes('Mobile')?'móvil':'ordenador',...partes});
+}
+function aplicarConfig(cfg){
+  if(!cfg)return;
+  if(cfg.plantilla){db.plantilla=cfg.plantilla;}
+  if(Array.isArray(cfg.variedades)&&cfg.variedades.length){
+    // El Sheet decide qué variedades hay y sus días; proveedor/lote/semillas se conservan de cada fuente
+    db.variedades=cfg.variedades.map(x=>{const loc=gv(x.codigo)||{proveedor:'',lote:'',lote2:''};return {...loc,codigo:x.codigo,nombre:x.nombre,dias:x.dias};});
+  }
+  if(Array.isArray(cfg.compuestos)){db.compuestos=cfg.compuestos;}
+}
+
 
 function editV(i){const v=db.variedades[i];editVi=i;document.getElementById('vf-nombre').value=v.nombre;document.getElementById('vf-codigo').value=v.codigo;document.getElementById('vf-dias').value=v.dias;document.getElementById('vf-prov').value=v.proveedor||'';document.getElementById('vf-lote').value=v.lote||'';document.getElementById('vf-lote2').value=v.lote2||'';document.getElementById('vf-title').textContent='Editar variedad';document.getElementById('btn-cancel-var').style.display='block';document.getElementById('vf-card').scrollIntoView({behavior:'smooth',block:'nearest'});}
 function cancelVar(){editVi=null;['vf-nombre','vf-codigo','vf-dias','vf-prov','vf-lote','vf-lote2'].forEach(i=>document.getElementById(i).value='');document.getElementById('vf-title').textContent='Nueva variedad';document.getElementById('btn-cancel-var').style.display='none';}
@@ -1118,11 +1178,12 @@ async function guardarVar(){
   if(!n||!c||!d){toast('Completa nombre, código y días');return;}
   if(db.variedades.find((v,i)=>v.codigo===c&&i!==editVi)){toast('Código ya existe');return;}
   const entry={codigo:c,nombre:n,dias:d,proveedor:prov,lote,lote2};
-  if(editVi!==null)db.variedades[editVi]=entry;else db.variedades.push(entry);
+  if(editVi!==null)db.variedades[editVi]={...db.variedades[editVi],...entry};else db.variedades.push(entry);
   save();poblarVarSel();renderCatalogo();toast('Variedad guardada');
+  syncConfig({variedades:variedadesConfig()});
   if(lote)syncSheet({tipo:'lote_activo',codigo:c,proveedor:prov,lote,lote2});
 }
-function delV(i){if(db.tandas.some(t=>t.codigo===db.variedades[i].codigo&&!t.cerrada)){toast('Tiene tandas activas');return;}db.variedades.splice(i,1);save();poblarVarSel();renderCatalogo();toast('Eliminada');}
+function delV(i){if(db.tandas.some(t=>t.codigo===db.variedades[i].codigo&&!t.cerrada)){toast('Tiene tandas activas');return;}db.variedades.splice(i,1);save();poblarVarSel();renderCatalogo();toast('Eliminada');syncConfig({variedades:variedadesConfig()});}
 
 function renderCfComps(){
   const cont=document.getElementById('cf-comps');
@@ -1136,8 +1197,8 @@ function renderCfComps(){
 function addCfComp(){cfComps.push({cod:db.variedades[0]?.codigo||'',bdj:1});renderCfComps();}
 function editC(i){const c=db.compuestos[i];editCi=i;document.getElementById('cf-nombre').value=c.nombre;document.getElementById('cf-codigo').value=c.codigo;cfComps=c.componentes.map(x=>({...x}));renderCfComps();document.getElementById('cf-title').textContent='Editar producto';document.getElementById('btn-cancel-comp').style.display='block';}
 function cancelComp(){editCi=null;document.getElementById('cf-nombre').value='';document.getElementById('cf-codigo').value='';cfComps=[];renderCfComps();document.getElementById('cf-title').textContent='Nuevo producto compuesto';document.getElementById('btn-cancel-comp').style.display='none';}
-function guardarComp(){const n=document.getElementById('cf-nombre').value.trim(),c=document.getElementById('cf-codigo').value.trim();if(!n||!c||!cfComps.length){toast('Completa nombre, código y al menos una variedad');return;}if(db.compuestos.find((x,i)=>x.codigo===c&&i!==editCi)){toast('Código ya existe');return;}if(editCi!==null)db.compuestos[editCi]={codigo:c,nombre:n,componentes:[...cfComps]};else db.compuestos.push({codigo:c,nombre:n,componentes:[...cfComps]});save();renderCatalogo();toast('Producto guardado');}
-function delC(i){db.compuestos.splice(i,1);save();renderCatalogo();toast('Eliminado');}
+function guardarComp(){const n=document.getElementById('cf-nombre').value.trim(),c=document.getElementById('cf-codigo').value.trim();if(!n||!c||!cfComps.length){toast('Completa nombre, código y al menos una variedad');return;}if(db.compuestos.find((x,i)=>x.codigo===c&&i!==editCi)){toast('Código ya existe');return;}if(editCi!==null)db.compuestos[editCi]={codigo:c,nombre:n,componentes:[...cfComps]};else db.compuestos.push({codigo:c,nombre:n,componentes:[...cfComps]});save();renderCatalogo();toast('Producto guardado');syncConfig({compuestos:db.compuestos});}
+function delC(i){db.compuestos.splice(i,1);save();renderCatalogo();toast('Eliminado');syncConfig({compuestos:db.compuestos});}
 
 
 // ── LIMPIEZA ──────────────────────────────────
@@ -1340,6 +1401,10 @@ async function cargarDesdeSheet() {
     const data = await res.json();
 
     if (data.ok) {
+      // Plantilla y catálogo compartidos (el Sheet manda). Si aún no existen, este dispositivo los siembra.
+      if (data.config) aplicarConfig(data.config);
+      else if ('config' in data) setTimeout(() => syncConfig({plantilla:db.plantilla, variedades:variedadesConfig(), compuestos:db.compuestos}), 1000);
+
       // Stock y configuración de semillas (el Sheet manda)
       const sem = data.semillas || {};
       const sinConfig = !Object.keys(sem).length;
